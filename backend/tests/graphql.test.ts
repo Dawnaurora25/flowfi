@@ -267,4 +267,89 @@ describe("GraphQL API", () => {
     expect(response.status).toBe(200);
     expect(Array.isArray(response.body.errors)).toBe(true);
   });
+
+  describe("Issue #1698: resolveStreams status filtering without collapsing inactive states", () => {
+    it.each([
+      {
+        status: "active",
+        expectedWhere: { isActive: true, isPaused: false },
+      },
+      {
+        status: "paused",
+        expectedWhere: { isPaused: true },
+      },
+      {
+        status: "cancelled",
+        expectedWhere: { isActive: false, events: { some: { eventType: "CANCELLED" } } },
+      },
+      {
+        status: "completed",
+        expectedWhere: { isActive: false, events: { some: { eventType: "COMPLETED" } } },
+      },
+    ])("maps status '$status' to distinct where condition", async ({ status, expectedWhere }) => {
+      let capturedWhere: any = null;
+      prismaMock.stream.findMany.mockImplementation(async ({ where }: { where: any }) => {
+        capturedWhere = where;
+        return [];
+      });
+
+      const response = await request(app).post("/graphql").send({
+        query: `query { streams(filter: { status: "${status}" }) { edges { node { id } } } }`,
+      });
+
+      expect(response.status).toBe(200);
+      expect(response.body.errors).toBeUndefined();
+      expect(capturedWhere).toMatchObject(expectedWhere);
+    });
+
+    it("rejects unknown status values", async () => {
+      const response = await request(app).post("/graphql").send({
+        query: 'query { streams(filter: { status: "unknown_status" }) { edges { node { id } } } }',
+      });
+
+      expect(response.status).toBe(200);
+      expect(Array.isArray(response.body.errors)).toBe(true);
+      expect(response.body.errors[0].message).toContain("Invalid status filter");
+    });
+  });
+
+  describe("Issue #1699: Accept full-width stream identifiers in GraphQL schema", () => {
+    it("queries stream with full-width u64 ID (> 2^31 - 1)", async () => {
+      const largeStreamId = "9223372036854775807"; // 2^63 - 1
+      prismaMock.stream.findUnique.mockResolvedValueOnce({
+        id: "stream-large",
+        streamId: BigInt(largeStreamId),
+        sender: ADDRESS,
+        recipient: "G-RECIPIENT",
+        tokenAddress: "TOKEN_A",
+        ratePerSecond: "10",
+        depositedAmount: "1000",
+        withdrawnAmount: "0",
+        startTime: BigInt(NOW),
+        endTime: null,
+        isActive: true,
+        isPaused: false,
+      });
+
+      const response = await request(app).post("/graphql").send({
+        query: `query { stream(streamId: "${largeStreamId}") { id streamId sender recipient } }`,
+      });
+
+      expect(response.status).toBe(200);
+      expect(response.body.errors).toBeUndefined();
+      expect(response.body.data.stream).not.toBeNull();
+      expect(response.body.data.stream.streamId).toBe(largeStreamId);
+    });
+
+    it("rejects out-of-range stream IDs", async () => {
+      const negativeStreamId = "-1";
+      const response = await request(app).post("/graphql").send({
+        query: `query { stream(streamId: "${negativeStreamId}") { id streamId } }`,
+      });
+
+      expect(response.status).toBe(200);
+      expect(Array.isArray(response.body.errors)).toBe(true);
+      expect(response.body.errors[0].message).toContain("out of supported range");
+    });
+  });
 });

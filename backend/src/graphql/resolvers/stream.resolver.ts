@@ -40,11 +40,21 @@ function parseCursor(cursor: string | null | undefined): bigint | undefined {
   }
 }
 
+const MAX_U64 = 18446744073709551615n;
+
 export async function resolveStream(
   ctx: GraphQLContext,
   streamId: number | string,
 ): Promise<unknown> {
-  const id = BigInt(streamId);
+  let id: bigint;
+  try {
+    id = BigInt(streamId);
+  } catch {
+    throw new Error(`Invalid stream identifier: ${streamId}`);
+  }
+  if (id < 0n || id > MAX_U64) {
+    throw new Error(`Stream identifier out of supported range (0 to 2^64 - 1): ${streamId}`);
+  }
   return ctx.loaders.stream.load(id);
 }
 
@@ -57,7 +67,30 @@ export async function resolveStreams(
   const filter = args.filter ?? {};
 
   const where: Prisma.StreamWhereInput = {};
-  if (filter.status) where.isActive = filter.status.toLowerCase() === "active";
+  if (filter.status !== undefined && filter.status !== null) {
+    const normalized = filter.status.toLowerCase().trim();
+    switch (normalized) {
+      case "active":
+        where.isActive = true;
+        where.isPaused = false;
+        break;
+      case "paused":
+        where.isPaused = true;
+        break;
+      case "cancelled":
+        where.isActive = false;
+        where.events = { some: { eventType: "CANCELLED" } };
+        break;
+      case "completed":
+        where.isActive = false;
+        where.events = { some: { eventType: "COMPLETED" } };
+        break;
+      default:
+        throw new Error(
+          `Invalid status filter: '${filter.status}'. Supported statuses are 'active', 'paused', 'cancelled', 'completed'.`,
+        );
+    }
+  }
   if (filter.tokenAddress) where.tokenAddress = filter.tokenAddress;
   if (filter.sender) where.sender = filter.sender;
   if (filter.recipient) where.recipient = filter.recipient;
