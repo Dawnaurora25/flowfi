@@ -6,6 +6,7 @@
 import type { Prisma } from "../../generated/prisma/index.js";
 import type { GraphQLContext } from "../context.js";
 import type { TokenMetadata } from "../dataloaders/index.js";
+import { claimableAmountService } from "../../services/claimable.service.js";
 
 export interface StreamFilterInput {
   status?: string | null;
@@ -93,27 +94,45 @@ export async function resolveAccountOverview(
 ): Promise<AccountOverview> {
   // Amounts are persisted as decimal strings (i128 precision), so Prisma's
   // numeric `_sum` aggregate cannot be used; sum them in BigInt here instead.
-  const amountSelect = { depositedAmount: true, withdrawnAmount: true } as const;
-  const [sent, received, activeSent, activeReceived] = await Promise.all([
-    ctx.prisma.stream.findMany({ where: { sender: address }, select: amountSelect }),
-    ctx.prisma.stream.findMany({ where: { recipient: address }, select: amountSelect }),
-    ctx.prisma.stream.count({ where: { sender: address, isActive: true } }),
-    ctx.prisma.stream.count({ where: { recipient: address, isActive: true } }),
-  ]);
+  // A single OR query returns self-directed streams once, even when both
+  // the sender and recipient match the wallet.
+  const streams = await ctx.prisma.stream.findMany({
+    where: { OR: [{ sender: address }, { recipient: address }] },
+    select: {
+      streamId: true,
+      recipient: true,
+      tokenAddress: true,
+      depositedAmount: true,
+      withdrawnAmount: true,
+      ratePerSecond: true,
+      startTime: true,
+      lastUpdateTime: true,
+      isActive: true,
+      isPaused: true,
+      pausedAt: true,
+      totalPausedDuration: true,
+    },
+  });
 
-  const sum = (rows: Array<{ depositedAmount: string; withdrawnAmount: string }>, key: "depositedAmount" | "withdrawnAmount"): bigint =>
-    rows.reduce((total, row) => total + BigInt(row[key] || "0"), 0n);
-
-  const all = [...sent, ...received];
-  const deposited = sum(all, "depositedAmount");
-  const withdrawn = sum(all, "withdrawnAmount");
-  const claimable = deposited > withdrawn ? deposited - withdrawn : 0n;
+  let deposited = 0n;
+  let withdrawn = 0n;
+  let claimable = 0n;
+  let activeStreams = 0;
+  const now = Math.floor(Date.now() / 1000);
+  for (const stream of streams) {
+    deposited += BigInt(stream.depositedAmount);
+    withdrawn += BigInt(stream.withdrawnAmount);
+    if (stream.isActive) activeStreams++;
+    if (stream.recipient === address) {
+      claimable += BigInt(claimableAmountService.getClaimableAmount(stream, now).claimableAmount);
+    }
+  }
 
   return {
     totalDeposited: deposited.toString(),
     totalWithdrawn: withdrawn.toString(),
     totalClaimable: claimable.toString(),
-    activeStreams: activeSent + activeReceived,
+    activeStreams,
   };
 }
 
