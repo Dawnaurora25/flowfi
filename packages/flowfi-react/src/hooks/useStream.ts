@@ -136,7 +136,10 @@ export function useStream(
 
     void (async () => {
       try {
-        const cleanEndpoint = endpoint.replace(/\/+$/, '');
+        let cleanEndpoint = endpoint;
+        while (cleanEndpoint.endsWith('/')) {
+          cleanEndpoint = cleanEndpoint.slice(0, -1);
+        }
         const url = `${cleanEndpoint}/${encodeURIComponent(streamId)}`;
         const res = await fetch(url, { headers: { Accept: 'application/json' } });
 
