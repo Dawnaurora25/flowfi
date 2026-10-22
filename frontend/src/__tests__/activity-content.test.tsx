@@ -69,7 +69,7 @@ describe("ActivityContent API failure states", () => {
       removeItem: vi.fn(),
       key: vi.fn(() => null),
       length: 0,
-    } as any);
+    });
   });
 
   it("shows access denied when wallet is not connected", () => {
@@ -94,7 +94,7 @@ describe("ActivityContent API failure states", () => {
       removeItem: vi.fn(),
       key: vi.fn(() => null),
       length: 0,
-    } as any);
+    });
 
     // Mock fetch to return 401
     vi.stubGlobal("fetch", vi.fn(() =>
@@ -104,7 +104,7 @@ describe("ActivityContent API failure states", () => {
         statusText: "Unauthorized",
         json: async () => ({ error: "Unauthorized" }),
       } as Response),
-    ) as any);
+    ));
 
     const { unmount } = render(<ActivityContent />);
 
@@ -127,14 +127,14 @@ describe("ActivityContent API failure states", () => {
       removeItem: vi.fn(),
       key: vi.fn(() => null),
       length: 0,
-    } as any);
+    });
 
     // Mock fetch to timeout
     vi.stubGlobal("fetch", vi.fn(() =>
       new Promise((_resolve, reject) => {
         setTimeout(() => reject(new Error("AbortError")), 5000);
       }),
-    ) as any);
+    ));
 
     const { unmount } = render(<ActivityContent />);
 
@@ -154,7 +154,7 @@ describe("ActivityContent API failure states", () => {
       removeItem: vi.fn(),
       key: vi.fn(() => null),
       length: 0,
-    } as any);
+    });
 
     // Mock fetch to return non-ok response with malformed JSON
     vi.stubGlobal("fetch", vi.fn(() =>
@@ -167,7 +167,7 @@ describe("ActivityContent API failure states", () => {
           throw new Error("Unexpected end of JSON input");
         },
       } as Response),
-    ) as any);
+    ));
 
     const { unmount } = render(<ActivityContent />);
 
@@ -187,7 +187,7 @@ describe("ActivityContent API failure states", () => {
       removeItem: vi.fn(),
       key: vi.fn(() => null),
       length: 0,
-    } as any);
+    });
 
     // Mock fetch to return successful response with empty events
     vi.stubGlobal("fetch", vi.fn(() =>
@@ -199,7 +199,7 @@ describe("ActivityContent API failure states", () => {
           hasMore: false,
         }),
       } as Response),
-    ) as any);
+    ));
 
     const { unmount } = render(<ActivityContent />);
 
@@ -219,7 +219,7 @@ describe("ActivityContent API failure states", () => {
       removeItem: vi.fn(),
       key: vi.fn(() => null),
       length: 0,
-    } as any);
+    });
 
     // Mock fetch to return successful response with partial events
     vi.stubGlobal("fetch", vi.fn(() =>
@@ -243,7 +243,7 @@ describe("ActivityContent API failure states", () => {
           hasMore: false,
         }),
       } as Response),
-    ) as any);
+    ));
 
     const { unmount } = render(<ActivityContent />);
 
@@ -267,7 +267,7 @@ describe("ActivityContent API failure states", () => {
       removeItem: vi.fn(),
       key: vi.fn(() => null),
       length: 0,
-    } as any);
+    });
 
     // Mock fetch to return response with many events
     const manyEvents = Array.from({ length: 25 }, (_, i) => ({
@@ -291,7 +291,7 @@ describe("ActivityContent API failure states", () => {
           hasMore: true,
         }),
       } as Response),
-    ) as any);
+    ));
 
     const { unmount } = render(<ActivityContent />);
 
@@ -317,12 +317,12 @@ describe("ActivityContent API failure states", () => {
       removeItem: vi.fn(),
       key: vi.fn(() => null),
       length: 0,
-    } as any);
+    });
 
     // Mock fetch to throw network error
     vi.stubGlobal("fetch", vi.fn(() =>
       Promise.reject(new Error("Network error: fetch failed")),
-    ) as any);
+    ));
 
     const { unmount } = render(<ActivityContent />);
 
@@ -342,7 +342,7 @@ describe("ActivityContent API failure states", () => {
       removeItem: vi.fn(),
       key: vi.fn(() => null),
       length: 0,
-    } as any);
+    });
 
     const { unmount } = render(<ActivityContent />);
 

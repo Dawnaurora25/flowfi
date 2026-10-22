@@ -161,7 +161,7 @@ describe("DashboardView optimistic action rollback", () => {
           },
         ],
         incomingStreams: [],
-      } as any,
+      },
     );
 
     const renderDashboard = () =>
@@ -230,7 +230,7 @@ describe("DashboardView optimistic action rollback", () => {
           },
         ],
         incomingStreams: [],
-      } as any,
+      },
     );
 
     const renderDashboard = () =>
@@ -299,7 +299,7 @@ describe("DashboardView optimistic action rollback", () => {
           },
         ],
         incomingStreams: [],
-      } as any,
+      },
     );
 
     const renderDashboard = () =>
@@ -367,7 +367,7 @@ describe("DashboardView optimistic action rollback", () => {
           },
         ],
         incomingStreams: [],
-      } as any,
+      },
     );
 
     const renderDashboard = () =>
@@ -449,7 +449,7 @@ describe("DashboardView optimistic action rollback", () => {
           },
         ],
         incomingStreams: [],
-      } as any,
+      },
     );
 
     const renderDashboard = () =>
