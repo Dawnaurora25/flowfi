@@ -316,7 +316,9 @@ describe("ActivityHistory event rendering", () => {
   it("renders FEE_COLLECTED event", () => {
     const event = makeEventWith({ eventType: "FEE_COLLECTED", amount: "100" });
     render(<ActivityHistory events={[event]} />);
-    expect(screen.getByText("Fee of 100 collected")).toBeInTheDocument();
+    expect(
+      screen.getByText(/Fee of 100 collected on Stream/),
+    ).toBeInTheDocument();
   });
 
 });
