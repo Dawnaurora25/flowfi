@@ -274,19 +274,39 @@ describe("ActivityHistory event rendering", () => {
   it("renders CREATED event", () => {
     const event = makeEventWith({ eventType: "CREATED" });
     render(<ActivityHistory events={[event]} />);
-    expect(screen.getByText("New stream created")).toBeInTheDocument();
+    expect(
+      screen.getByText(
+        (_, element) =>
+          element?.tagName === "P" &&
+          element.textContent?.startsWith("New stream created (") === true,
+      ),
+    ).toBeInTheDocument();
   });
 
   it("renders TOPPED_UP event with amount", () => {
     const event = makeEventWith({ eventType: "TOPPED_UP", amount: "5000" });
     render(<ActivityHistory events={[event]} />);
-    expect(screen.getByText("Topped up Stream")).toBeInTheDocument();
+    expect(
+      screen.getByText(
+        (_, element) =>
+          element?.tagName === "P" &&
+          element.textContent?.startsWith("Topped up Stream #12345 with") === true,
+      ),
+    ).toBeInTheDocument();
   });
 
   it("renders WITHDRAWN event", () => {
     const event = makeEventWith({ eventType: "WITHDRAWN" });
     render(<ActivityHistory events={[event]} />);
-    expect(screen.getByText("Withdrew")).toBeInTheDocument();
+    expect(
+      screen.getByText(
+        (_, element) =>
+          element?.tagName === "P" &&
+          element.textContent?.startsWith(
+            "Withdrew 1000 tokens from Stream #12345",
+          ) === true,
+      ),
+    ).toBeInTheDocument();
   });
 
   it("renders CANCELLED event", () => {
