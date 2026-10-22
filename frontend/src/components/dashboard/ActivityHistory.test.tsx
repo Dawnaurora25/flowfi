@@ -314,10 +314,16 @@ describe("ActivityHistory event rendering", () => {
   });
 
   it("renders FEE_COLLECTED event", () => {
-    const event = makeEventWith({ eventType: "FEE_COLLECTED", amount: "100" });
+    const event = makeEventWith({
+      eventType: "FEE_COLLECTED",
+      amount: "1000000000",
+    });
     render(<ActivityHistory events={[event]} />);
     expect(
-      screen.getByText(/Fee of 100 collected on Stream/),
+      screen.getByText(
+        (_, element) =>
+          element?.textContent === "Fee of 100 collected on Stream #12345",
+      ),
     ).toBeInTheDocument();
   });
 
