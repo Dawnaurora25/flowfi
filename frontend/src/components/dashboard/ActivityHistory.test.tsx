@@ -40,7 +40,7 @@ describe("ActivityHistory CSV export", () => {
 
     expect(downloadCSV).toHaveBeenCalledTimes(1);
     const [data, filename] = vi.mocked(downloadCSV).mock.calls[0]!;
-    expect(filename).toMatch(/^flowfi_activity_\\d+\\.csv$/);
+    expect(filename).toMatch(/^flowfi_activity_\d+\.csv$/);
     expect(data).toEqual([
       {
         "Stream ID": 12345,
