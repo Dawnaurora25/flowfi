@@ -210,7 +210,7 @@ describe("ActivityContent API failure states", () => {
 
     // Should show empty state when no events
     await waitFor(() =>
-      expect(screen.getByText(/No stream activity yet/i)).toBeInTheDocument(),
+      expect(screen.getByText(/No activity found for this filter/i)).toBeInTheDocument(),
     );
 
     unmount();
@@ -258,7 +258,11 @@ describe("ActivityContent API failure states", () => {
     );
 
     // Should show the event
-    const createdText = screen.getByText(/New stream created/);
+    const createdText = await screen.findByText(
+      (_, element) =>
+        element?.tagName === "P" &&
+        element.textContent?.startsWith("New stream created (") === true,
+    );
     expect(createdText).toBeInTheDocument();
 
     unmount();
@@ -306,7 +310,7 @@ describe("ActivityContent API failure states", () => {
     );
 
     // Should show load more button since hasMore is true
-    const loadMoreButton = screen.getByRole("button", {
+    const loadMoreButton = await screen.findByRole("button", {
       name: /Load More Activity/i,
     });
     expect(loadMoreButton).toBeInTheDocument();
