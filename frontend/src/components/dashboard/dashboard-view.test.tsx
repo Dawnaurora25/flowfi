@@ -173,7 +173,7 @@ describe("DashboardView optimistic action rollback", () => {
 
     const first = renderDashboard();
     await waitFor(() =>
-      expect(screen.getByText /start your first stream/i).toBeInTheDocument(),
+      expect(screen.getByText(/start your first stream/i)).toBeInTheDocument(),
     );
 
     // Verify initial deposited amount
@@ -189,7 +189,7 @@ describe("DashboardView optimistic action rollback", () => {
     // Re-render with error state
     const second = renderDashboard();
     await waitFor(() =>
-      expect(screen.getByText /failed to load streams/i).toBeInTheDocument(),
+      expect(screen.getByText(/failed to load streams/i)).toBeInTheDocument(),
     );
 
     // After error, the optimistic update should be rolled back
@@ -242,11 +242,11 @@ describe("DashboardView optimistic action rollback", () => {
 
     const first = renderDashboard();
     await waitFor(() =>
-      expect(screen.getByText /start your first stream/i).toBeInTheDocument(),
+      expect(screen.getByText(/start your first stream/i)).toBeInTheDocument(),
     );
 
     // Verify initial withdrawn amount
-    const withdrawnBefore = screen.getByText /50 XLM/;
+    const withdrawnBefore = screen.getByText(/50 XLM/);
     expect(withdrawnBefore).toBeInTheDocument();
 
     // Simulate a cancel failure
@@ -258,12 +258,12 @@ describe("DashboardView optimistic action rollback", () => {
     // Re-render with error state
     const second = renderDashboard();
     await waitFor(() =>
-      expect(screen.getByText /failed to load streams/i).toBeInTheDocument(),
+      expect(screen.getByText(/failed to load streams/i)).toBeInTheDocument(),
     );
 
     // After error, the optimistic update should be rolled back
     // The dashboard should still show the original withdrawn value
-    const withdrawnAfter = screen.getByText /50 XLM/;
+    const withdrawnAfter = screen.getByText(/50 XLM/);
     expect(withdrawnAfter).toBeInTheDocument();
   });
 
@@ -311,11 +311,11 @@ describe("DashboardView optimistic action rollback", () => {
 
     const first = renderDashboard();
     await waitFor(() =>
-      expect(screen.getByText /start your first stream/i).toBeInTheDocument(),
+      expect(screen.getByText(/start your first stream/i)).toBeInTheDocument(),
     );
 
     // Verify initial state
-    const withdrawnBefore = screen.getByText /25 XLM/;
+    const withdrawnBefore = screen.getByText(/25 XLM/);
     expect(withdrawnBefore).toBeInTheDocument();
 
     // Simulate a pause failure
@@ -327,11 +327,11 @@ describe("DashboardView optimistic action rollback", () => {
     // Re-render with error state
     const second = renderDashboard();
     await waitFor(() =>
-      expect(screen.getByText /failed to load streams/i).toBeInTheDocument(),
+      expect(screen.getByText(/failed to load streams/i)).toBeInTheDocument(),
     );
 
     // After error, the optimistic update should be rolled back
-    const withdrawnAfter = screen.getByText /25 XLM/;
+    const withdrawnAfter = screen.getByText(/25 XLM/);
     expect(withdrawnAfter).toBeInTheDocument();
   });
 
@@ -379,11 +379,11 @@ describe("DashboardView optimistic action rollback", () => {
 
     const first = renderDashboard();
     await waitFor(() =>
-      expect(screen.getByText /start your first stream/i).toBeInTheDocument(),
+      expect(screen.getByText(/start your first stream/i)).toBeInTheDocument(),
     );
 
     // Verify initial state - paused stream
-    const pausedBefore = screen.getByText /Paused/;
+    const pausedBefore = screen.getByText(/Paused/);
     expect(pausedBefore).toBeInTheDocument();
 
     // Simulate a resume failure
@@ -395,12 +395,12 @@ describe("DashboardView optimistic action rollback", () => {
     // Re-render with error state
     const second = renderDashboard();
     await waitFor(() =>
-      expect(screen.getByText /failed to load streams/i).toBeInTheDocument(),
+      expect(screen.getByText(/failed to load streams/i)).toBeInTheDocument(),
     );
 
     // After error, the optimistic update should be rolled back
     // Stream should remain paused
-    const pausedAfter = screen.getByText /Paused/;
+    const pausedAfter = screen.getByText(/Paused/);
     expect(pausedAfter).toBeInTheDocument();
   });
 
@@ -461,12 +461,12 @@ describe("DashboardView optimistic action rollback", () => {
 
     const first = renderDashboard();
     await waitFor(() =>
-      expect(screen.getByText /start your first stream/i).toBeInTheDocument(),
+      expect(screen.getByText(/start your first stream/i)).toBeInTheDocument(),
     );
 
     // Verify initial state
-    const stream1WithdrawnBefore = screen.getByText /0 XLM/;
-    const stream2WithdrawnBefore = screen.getByText /50 XLM/;
+    const stream1WithdrawnBefore = screen.getByText(/0 XLM/);
+    const stream2WithdrawnBefore = screen.getByText(/50 XLM/);
     expect(stream1WithdrawnBefore).toBeInTheDocument();
     expect(stream2WithdrawnBefore).toBeInTheDocument();
 
@@ -479,16 +479,16 @@ describe("DashboardView optimistic action rollback", () => {
     // Re-render with error state
     const second = renderDashboard();
     await waitFor(() =>
-      expect(screen.getByText /failed to load streams/i).toBeInTheDocument(),
+      expect(screen.getByText(/failed to load streams/i)).toBeInTheDocument(),
     );
 
     // After error, stream-2 should roll back to original withdrawn value
     // but stream-1 should remain unchanged
-    const stream2WithdrawnAfter = screen.getByText /50 XLM/;
+    const stream2WithdrawnAfter = screen.getByText(/50 XLM/);
     expect(stream2WithdrawnAfter).toBeInTheDocument();
 
     // stream-1 withdrawn should still be 0
-    const stream1WithdrawnAfter = screen.getByText /0 XLM/;
+    const stream1WithdrawnAfter = screen.getByText(/0 XLM/);
     expect(stream1WithdrawnAfter).toBeInTheDocument();
   });
 });

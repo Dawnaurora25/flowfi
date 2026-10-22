@@ -79,7 +79,7 @@ describe("ActivityContent API failure states", () => {
     const accessDenied = screen.getByText(/Access Denied/);
     expect(accessDenied).toBeInTheDocument();
 
-    const pleaseConnect = screen.getByText/Please connect your wallet/;
+    const pleaseConnect = screen.getByText(/Please connect your wallet/);
     expect(pleaseConnect).toBeInTheDocument();
 
     unmount();
@@ -110,7 +110,7 @@ describe("ActivityContent API failure states", () => {
 
     // Should show error state after failed fetch
     await waitFor(() =>
-      expect(screen.getByText /failed to fetch activity/i).toBeInTheDocument(),
+      expect(screen.getByText(/failed to fetch activity/i)).toBeInTheDocument(),
     );
 
     const retryButton = screen.getByRole("button", { name: /retry/i });
@@ -140,7 +140,7 @@ describe("ActivityContent API failure states", () => {
 
     // Should handle timeout gracefully
     await waitFor(() =>
-      expect(screen.getByText /failed to fetch activity/i).toBeInTheDocument(),
+      expect(screen.getByText(/failed to fetch activity/i)).toBeInTheDocument(),
     );
 
     unmount();
@@ -173,7 +173,7 @@ describe("ActivityContent API failure states", () => {
 
     // Should handle malformed JSON gracefully
     await waitFor(() =>
-      expect(screen.getByText /failed to fetch activity/i).toBeInTheDocument(),
+      expect(screen.getByText(/failed to fetch activity/i)).toBeInTheDocument(),
     );
 
     unmount();
@@ -205,7 +205,7 @@ describe("ActivityContent API failure states", () => {
 
     // Should show empty state when no events
     await waitFor(() =>
-      expect(screen.getByText /No stream activity yet/i).toBeInTheDocument(),
+      expect(screen.getByText(/No stream activity yet/i)).toBeInTheDocument(),
     );
 
     unmount();
@@ -249,11 +249,11 @@ describe("ActivityContent API failure states", () => {
 
     // Should render activity with the events
     await waitFor(() =>
-      expect(screen.getByText /Stream Activity/i).toBeInTheDocument(),
+      expect(screen.getByText(/Stream Activity/i)).toBeInTheDocument(),
     );
 
     // Should show the event
-    const createdText = screen.getByText /New stream created/;
+    const createdText = screen.getByText(/New stream created/);
     expect(createdText).toBeInTheDocument();
 
     unmount();
@@ -297,7 +297,7 @@ describe("ActivityContent API failure states", () => {
 
     // Should render activity with events
     await waitFor(() =>
-      expect(screen.getByText /Stream Activity/i).toBeInTheDocument(),
+      expect(screen.getByText(/Stream Activity/i)).toBeInTheDocument(),
     );
 
     // Should show load more button since hasMore is true
@@ -328,7 +328,7 @@ describe("ActivityContent API failure states", () => {
 
     // Should handle network error gracefully
     await waitFor(() =>
-      expect(screen.getByText /failed to fetch activity/i).toBeInTheDocument(),
+      expect(screen.getByText(/failed to fetch activity/i)).toBeInTheDocument(),
     );
 
     unmount();
@@ -350,7 +350,7 @@ describe("ActivityContent API failure states", () => {
     const accessDenied = screen.getByText(/Access Denied/);
     expect(accessDenied).toBeInTheDocument();
 
-    const pleaseConnect = screen.getByText/Please connect your wallet/;
+    const pleaseConnect = screen.getByText(/Please connect your wallet/);
     expect(pleaseConnect).toBeInTheDocument();
 
     unmount();
