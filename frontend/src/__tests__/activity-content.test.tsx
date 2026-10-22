@@ -11,13 +11,22 @@ vi.mock("next/navigation", () => ({
   useSearchParams: vi.fn(() => new URLSearchParams()),
 }));
 
-vi.mock("@/context/wallet-context", () => ({
-  useWallet: () => ({
-    session: null,
-    disconnect: vi.fn(),
-    isHydrated: true,
-  }),
-}));
+vi.mock("@/context/wallet-context", () => {
+  const session = {
+    publicKey: "GABCDEFPUBLICKEY000000000000000000000000000000000000000",
+  };
+  return {
+    useWallet: () => {
+      const connected = localStorage.getItem("session") !== null;
+      return {
+        session: connected ? session : null,
+        status: connected ? "connected" : "disconnected",
+        disconnect: vi.fn(),
+        isHydrated: true,
+      };
+    },
+  };
+});
 
 vi.mock("@/lib/wallet", () => ({
   shortenPublicKey: (key: string) => `${key.slice(0, 4)}...${key.slice(-4)}`,
@@ -130,11 +139,7 @@ describe("ActivityContent API failure states", () => {
     });
 
     // Mock fetch to timeout
-    vi.stubGlobal("fetch", vi.fn(() =>
-      new Promise((_resolve, reject) => {
-        setTimeout(() => reject(new Error("AbortError")), 5000);
-      }),
-    ));
+    vi.stubGlobal("fetch", vi.fn(() => Promise.reject(new Error("Request timed out"))));
 
     const { unmount } = render(<ActivityContent />);
 
