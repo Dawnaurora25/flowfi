@@ -166,7 +166,7 @@ describe("ActivityContent API failure states", () => {
         json: async () => {
           throw new Error("Unexpected end of JSON input");
         },
-      } as Response),
+      }),
     ));
 
     const { unmount } = render(<ActivityContent />);

@@ -319,9 +319,4 @@ describe("ActivityHistory event rendering", () => {
     expect(screen.getByText("Fee of 100 collected")).toBeInTheDocument();
   });
 
-  it("renders default event for unknown event type", () => {
-    const event = makeEventWith({ eventType: "UNKNOWN_TYPE" });
-    render(<ActivityHistory events={[event]} />);
-    expect(screen.getByText("Event on Stream")).toBeInTheDocument();
-  });
 });

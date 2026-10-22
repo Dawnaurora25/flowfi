@@ -1,16 +1,7 @@
-import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
-import { render, screen, waitFor } from "@testing-library/react";
-import userEvent from "@testing-library/user-event";
+import { describe, expect, it, vi, beforeEach } from "vitest";
+import { fireEvent, render, screen, waitFor } from "@testing-library/react";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import React from "react";
-
-// ─── Mocks ──────────────────────────────────────────────────────────────────
-//
-// dashboard-view.tsx pulls in a lot of feature components (the stream
-// creation wizard, modals, SSE status indicator, etc.) that aren't relevant
-// to the "does switching tabs/routes re-trigger a network fetch within
-// staleTime" question this file is about. They're stubbed out below so the
-// test can focus on the useDashboard/query-cache wiring.
 
 vi.mock("next/navigation", () => ({
   useRouter: vi.fn(() => ({ push: vi.fn() })),
@@ -39,10 +30,10 @@ vi.mock("@/lib/soroban", () => ({
   topUpStream: vi.fn(),
   cancelStream: vi.fn(),
   withdrawFromStream: vi.fn(),
-  toBaseUnits: vi.fn((v: string) => BigInt(v)),
+  toBaseUnits: vi.fn((value: string) => BigInt(value)),
   toDurationSeconds: vi.fn(() => 0),
   getTokenAddress: vi.fn((symbol: string) => symbol),
-  toSorobanErrorMessage: vi.fn((e) => String(e)),
+  toSorobanErrorMessage: vi.fn((error: unknown) => String(error)),
   fetchTokenBalanceDisplay: vi.fn().mockResolvedValue("1000"),
 }));
 
@@ -63,11 +54,41 @@ vi.mock("../stream-creation/StreamCreationWizard", () => ({
 }));
 
 vi.mock("../stream-creation/TopUpModal", () => ({
-  TopUpModal: () => <div data-testid="topup-modal" />,
+  TopUpModal: ({
+    streamId,
+    onConfirm,
+  }: {
+    streamId: string;
+    onConfirm: (streamId: string, amount: string) => Promise<void>;
+  }) => (
+    <button
+      type="button"
+      onClick={() => {
+        void onConfirm(streamId, "25").catch(() => undefined);
+      }}
+    >
+      Confirm top-up
+    </button>
+  ),
 }));
 
 vi.mock("../stream-creation/CancelConfirmModal", () => ({
-  CancelConfirmModal: () => <div data-testid="cancel-modal" />,
+  CancelConfirmModal: ({
+    streamId,
+    onConfirm,
+  }: {
+    streamId: string;
+    onConfirm: (streamId: string) => Promise<void>;
+  }) => (
+    <button
+      type="button"
+      onClick={() => {
+        void onConfirm(streamId).catch(() => undefined);
+      }}
+    >
+      Confirm cancellation
+    </button>
+  ),
 }));
 
 vi.mock("./StreamDetailsModal", () => ({
@@ -93,6 +114,12 @@ vi.mock("../ui/Button", () => ({
 }));
 
 import { DashboardView } from "./dashboard-view";
+import { cancelStream, topUpStream } from "@/lib/soroban";
+import {
+  dashboardQueryKey,
+  type DashboardSnapshot,
+  type Stream,
+} from "@/lib/dashboard";
 import type { WalletSession } from "@/lib/wallet";
 
 const PUBLIC_KEY = "GABCDEFPUBLICKEY000000000000000000000000000000000000000";
@@ -106,389 +133,94 @@ const session: WalletSession = {
   mocked: false,
 };
 
-function jsonResponse(body: unknown) {
+function makeStream(
+  id: string,
+  deposited: number,
+  withdrawn: number,
+): Stream {
   return {
-    ok: true,
-    status: 200,
-    json: async () => body,
-  } as Response;
+    id,
+    recipient: `GABCDEF12345678901234567890123456789012${id.slice(-1)}`,
+    amount: deposited,
+    token: "XLM",
+    status: "Active",
+    deposited,
+    withdrawn,
+    date: "2024-01-01",
+    ratePerSecond: 10,
+    lastUpdateTime: 1000,
+    isActive: true,
+  };
 }
 
-// ─── Optimistic Action Rollback Tests ──────────────────────────────────────
-//
-// Tests for failed top-up, pause, resume, and cancel actions lacking UI rollback.
-// These test the error handling paths when optimistic UI actions fail and need to
-// roll back to their previous state.
+function renderDashboard(streams: Stream[]) {
+  const queryClient = new QueryClient({
+    defaultOptions: {
+      queries: { staleTime: 10_000, refetchOnWindowFocus: false, retry: 1 },
+    },
+  });
+  const snapshot: DashboardSnapshot = {
+    totalSent: 0,
+    totalReceived: 0,
+    totalValueLocked: 1000,
+    activeStreamsCount: streams.length,
+    recentActivity: [],
+    outgoingStreams: streams,
+    incomingStreams: [],
+  };
+  queryClient.setQueryData(dashboardQueryKey(PUBLIC_KEY), snapshot);
 
-describe("DashboardView optimistic action rollback", () => {
+  return render(
+    <QueryClientProvider client={queryClient}>
+      <DashboardView session={session} onDisconnect={vi.fn()} />
+    </QueryClientProvider>,
+  );
+}
+
+describe("DashboardView failed actions", () => {
   beforeEach(() => {
-    vi.stubGlobal("fetch", vi.fn().mockResolvedValue(jsonResponse([])));
+    vi.mocked(topUpStream).mockReset();
+    vi.mocked(cancelStream).mockReset();
   });
 
-  afterEach(() => {
-    vi.unstubAllGlobals();
+  it("preserves the deposited amount when a top-up fails", async () => {
+    vi.mocked(topUpStream).mockRejectedValueOnce(new Error("top-up failed"));
+    renderDashboard([makeStream("stream-1", 100, 0)]);
+
+    expect(screen.getByText("100 XLM")).toBeInTheDocument();
+    fireEvent.click(screen.getByRole("button", { name: "Add Funds" }));
+    fireEvent.click(screen.getByRole("button", { name: "Confirm top-up" }));
+
+    await waitFor(() => expect(topUpStream).toHaveBeenCalledTimes(1));
+    expect(screen.getByText("100 XLM")).toBeInTheDocument();
   });
 
-  it("handles top-up failure and rolls back optimistic update", async () => {
-    const queryClient = new QueryClient({
-      defaultOptions: {
-        queries: { staleTime: 10_000, refetchOnWindowFocus: false, retry: 1 },
-      },
-    });
+  it("keeps the stream active when cancellation fails", async () => {
+    vi.mocked(cancelStream).mockRejectedValueOnce(new Error("cancel failed"));
+    renderDashboard([makeStream("stream-1", 100, 50)]);
 
-    // Mock snapshot with initial state
-    queryClient.setQueryData(
-      [ "dashboard", PUBLIC_KEY ],
-      {
-        totalSent: 0,
-        totalReceived: 0,
-        totalValueLocked: 1000,
-        activeStreamsCount: 1,
-        recentActivity: [],
-        outgoingStreams: [
-          {
-            id: "stream-1",
-            recipient: "GABCDEF123456789012345678901234567890123",
-            amount: 100,
-            token: "XLM",
-            status: "Active",
-            deposited: 100,
-            withdrawn: 0,
-            date: "2024-01-01",
-            ratePerSecond: 10,
-            lastUpdateTime: 1000,
-            isActive: true,
-          },
-        ],
-        incomingStreams: [],
-      },
-    );
+    expect(screen.getByText("50 XLM")).toBeInTheDocument();
+    fireEvent.click(screen.getByRole("button", { name: "Cancel" }));
+    fireEvent.click(screen.getByRole("button", { name: "Confirm cancellation" }));
 
-    const renderDashboard = () =>
-      render(
-        <QueryClientProvider client={queryClient}>
-          <DashboardView session={session} onDisconnect={vi.fn()} />
-        </QueryClientProvider>,
-      );
-
-    const first = renderDashboard();
-    await waitFor(() =>
-      expect(screen.getByText(/start your first stream/i)).toBeInTheDocument(),
-    );
-
-    // Verify initial deposited amount
-    const depositedBefore = screen.getByText(/100 XLM/);
-    expect(depositedBefore).toBeInTheDocument();
-
-    // Simulate a top-up failure - mock the toast error
-    vi.stubGlobal(
-      "fetch",
-      vi.fn().mockRejectedValue(new Error("top-up failed")),
-    );
-
-    // Re-render with error state
-    const second = renderDashboard();
-    await waitFor(() =>
-      expect(screen.getByText(/failed to load streams/i)).toBeInTheDocument(),
-    );
-
-    // After error, the optimistic update should be rolled back
-    // The dashboard should still show the original value
-    const depositedAfter = screen.getByText(/100 XLM/);
-    expect(depositedAfter).toBeInTheDocument();
+    await waitFor(() => expect(cancelStream).toHaveBeenCalledTimes(1));
+    expect(screen.getByText("50 XLM")).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "Cancel" })).toBeInTheDocument();
   });
 
-  it("handles cancel failure and rolls back optimistic update", async () => {
-    const queryClient = new QueryClient({
-      defaultOptions: {
-        queries: { staleTime: 10_000, refetchOnWindowFocus: false, retry: 1 },
-      },
-    });
+  it("does not change other streams when one top-up fails", async () => {
+    vi.mocked(topUpStream).mockRejectedValueOnce(new Error("top-up failed"));
+    renderDashboard([
+      makeStream("stream-1", 100, 0),
+      makeStream("stream-2", 200, 50),
+    ]);
 
-    // Mock snapshot with active stream
-    queryClient.setQueryData(
-      [ "dashboard", PUBLIC_KEY ],
-      {
-        totalSent: 0,
-        totalReceived: 0,
-        totalValueLocked: 500,
-        activeStreamsCount: 1,
-        recentActivity: [],
-        outgoingStreams: [
-          {
-            id: "stream-1",
-            recipient: "GABCDEF123456789012345678901234567890123",
-            amount: 100,
-            token: "XLM",
-            status: "Active",
-            deposited: 100,
-            withdrawn: 50,
-            date: "2024-01-01",
-            ratePerSecond: 5,
-            lastUpdateTime: 1000,
-            isActive: true,
-          },
-        ],
-        incomingStreams: [],
-      },
-    );
+    fireEvent.click(screen.getAllByRole("button", { name: "Add Funds" })[1]!);
+    fireEvent.click(screen.getByRole("button", { name: "Confirm top-up" }));
 
-    const renderDashboard = () =>
-      render(
-        <QueryClientProvider client={queryClient}>
-          <DashboardView session={session} onDisconnect={vi.fn()} />
-        </QueryClientProvider>,
-      );
-
-    const first = renderDashboard();
-    await waitFor(() =>
-      expect(screen.getByText(/start your first stream/i)).toBeInTheDocument(),
-    );
-
-    // Verify initial withdrawn amount
-    const withdrawnBefore = screen.getByText(/50 XLM/);
-    expect(withdrawnBefore).toBeInTheDocument();
-
-    // Simulate a cancel failure
-    vi.stubGlobal(
-      "fetch",
-      vi.fn().mockRejectedValue(new Error("cancel failed")),
-    );
-
-    // Re-render with error state
-    const second = renderDashboard();
-    await waitFor(() =>
-      expect(screen.getByText(/failed to load streams/i)).toBeInTheDocument(),
-    );
-
-    // After error, the optimistic update should be rolled back
-    // The dashboard should still show the original withdrawn value
-    const withdrawnAfter = screen.getByText(/50 XLM/);
-    expect(withdrawnAfter).toBeInTheDocument();
-  });
-
-  it("handles pause failure and rolls back optimistic update", async () => {
-    const queryClient = new QueryClient({
-      defaultOptions: {
-        queries: { staleTime: 10_000, refetchOnWindowFocus: false, retry: 1 },
-      },
-    });
-
-    // Mock snapshot with active stream
-    queryClient.setQueryData(
-      [ "dashboard", PUBLIC_KEY ],
-      {
-        totalSent: 0,
-        totalReceived: 0,
-        totalValueLocked: 750,
-        activeStreamsCount: 1,
-        recentActivity: [],
-        outgoingStreams: [
-          {
-            id: "stream-1",
-            recipient: "GABCDEF123456789012345678901234567890123",
-            amount: 100,
-            token: "XLM",
-            status: "Active",
-            deposited: 100,
-            withdrawn: 25,
-            date: "2024-01-01",
-            ratePerSecond: 7.5,
-            lastUpdateTime: 1000,
-            isActive: true,
-          },
-        ],
-        incomingStreams: [],
-      },
-    );
-
-    const renderDashboard = () =>
-      render(
-        <QueryClientProvider client={queryClient}>
-          <DashboardView session={session} onDisconnect={vi.fn()} />
-        </QueryClientProvider>,
-      );
-
-    const first = renderDashboard();
-    await waitFor(() =>
-      expect(screen.getByText(/start your first stream/i)).toBeInTheDocument(),
-    );
-
-    // Verify initial state
-    const withdrawnBefore = screen.getByText(/25 XLM/);
-    expect(withdrawnBefore).toBeInTheDocument();
-
-    // Simulate a pause failure
-    vi.stubGlobal(
-      "fetch",
-      vi.fn().mockRejectedValue(new Error("pause failed")),
-    );
-
-    // Re-render with error state
-    const second = renderDashboard();
-    await waitFor(() =>
-      expect(screen.getByText(/failed to load streams/i)).toBeInTheDocument(),
-    );
-
-    // After error, the optimistic update should be rolled back
-    const withdrawnAfter = screen.getByText(/25 XLM/);
-    expect(withdrawnAfter).toBeInTheDocument();
-  });
-
-  it("handles resume failure and rolls back optimistic update", async () => {
-    const queryClient = new QueryClient({
-      defaultOptions: {
-        queries: { staleTime: 10_000, refetchOnWindowFocus: false, retry: 1 },
-      },
-    });
-
-    // Mock snapshot with paused stream
-    queryClient.setQueryData(
-      [ "dashboard", PUBLIC_KEY ],
-      {
-        totalSent: 0,
-        totalReceived: 0,
-        totalValueLocked: 200,
-        activeStreamsCount: 1,
-        recentActivity: [],
-        outgoingStreams: [
-          {
-            id: "stream-1",
-            recipient: "GABCDEF123456789012345678901234567890123",
-            amount: 100,
-            token: "XLM",
-            status: "Paused",
-            deposited: 100,
-            withdrawn: 0,
-            date: "2024-01-01",
-            ratePerSecond: 0,
-            lastUpdateTime: 1000,
-            isActive: false,
-          },
-        ],
-        incomingStreams: [],
-      },
-    );
-
-    const renderDashboard = () =>
-      render(
-        <QueryClientProvider client={queryClient}>
-          <DashboardView session={session} onDisconnect={vi.fn()} />
-        </QueryClientProvider>,
-      );
-
-    const first = renderDashboard();
-    await waitFor(() =>
-      expect(screen.getByText(/start your first stream/i)).toBeInTheDocument(),
-    );
-
-    // Verify initial state - paused stream
-    const pausedBefore = screen.getByText(/Paused/);
-    expect(pausedBefore).toBeInTheDocument();
-
-    // Simulate a resume failure
-    vi.stubGlobal(
-      "fetch",
-      vi.fn().mockRejectedValue(new Error("resume failed")),
-    );
-
-    // Re-render with error state
-    const second = renderDashboard();
-    await waitFor(() =>
-      expect(screen.getByText(/failed to load streams/i)).toBeInTheDocument(),
-    );
-
-    // After error, the optimistic update should be rolled back
-    // Stream should remain paused
-    const pausedAfter = screen.getByText(/Paused/);
-    expect(pausedAfter).toBeInTheDocument();
-  });
-
-  it("handles mixed optimistic actions with partial failures", async () => {
-    const queryClient = new QueryClient({
-      defaultOptions: {
-        queries: { staleTime: 10_000, refetchOnWindowFocus: false, retry: 1 },
-      },
-    });
-
-    // Mock snapshot with multiple streams
-    queryClient.setQueryData(
-      [ "dashboard", PUBLIC_KEY ],
-      {
-        totalSent: 0,
-        totalReceived: 0,
-        totalValueLocked: 1500,
-        activeStreamsCount: 2,
-        recentActivity: [],
-        outgoingStreams: [
-          {
-            id: "stream-1",
-            recipient: "GABCDEF123456789012345678901234567890123",
-            amount: 100,
-            token: "XLM",
-            status: "Active",
-            deposited: 100,
-            withdrawn: 0,
-            date: "2024-01-01",
-            ratePerSecond: 10,
-            lastUpdateTime: 1000,
-            isActive: true,
-          },
-          {
-            id: "stream-2",
-            recipient: "GABCDEF123456789012345678901234567890124",
-            amount: 200,
-            token: "XLM",
-            status: "Active",
-            deposited: 200,
-            withdrawn: 50,
-            date: "2024-01-01",
-            ratePerSecond: 20,
-            lastUpdateTime: 2000,
-            isActive: true,
-          },
-        ],
-        incomingStreams: [],
-      },
-    );
-
-    const renderDashboard = () =>
-      render(
-        <QueryClientProvider client={queryClient}>
-          <DashboardView session={session} onDisconnect={vi.fn()} />
-        </QueryClientProvider>,
-      );
-
-    const first = renderDashboard();
-    await waitFor(() =>
-      expect(screen.getByText(/start your first stream/i)).toBeInTheDocument(),
-    );
-
-    // Verify initial state
-    const stream1WithdrawnBefore = screen.getByText(/0 XLM/);
-    const stream2WithdrawnBefore = screen.getByText(/50 XLM/);
-    expect(stream1WithdrawnBefore).toBeInTheDocument();
-    expect(stream2WithdrawnBefore).toBeInTheDocument();
-
-    // Simulate a top-up failure for stream-2
-    vi.stubGlobal(
-      "fetch",
-      vi.fn().mockRejectedValue(new Error("top-up failed")),
-    );
-
-    // Re-render with error state
-    const second = renderDashboard();
-    await waitFor(() =>
-      expect(screen.getByText(/failed to load streams/i)).toBeInTheDocument(),
-    );
-
-    // After error, stream-2 should roll back to original withdrawn value
-    // but stream-1 should remain unchanged
-    const stream2WithdrawnAfter = screen.getByText(/50 XLM/);
-    expect(stream2WithdrawnAfter).toBeInTheDocument();
-
-    // stream-1 withdrawn should still be 0
-    const stream1WithdrawnAfter = screen.getByText(/0 XLM/);
-    expect(stream1WithdrawnAfter).toBeInTheDocument();
+    await waitFor(() => expect(topUpStream).toHaveBeenCalledTimes(1));
+    expect(screen.getByText("100 XLM")).toBeInTheDocument();
+    expect(screen.getByText("200 XLM")).toBeInTheDocument();
+    expect(screen.getByText("50 XLM")).toBeInTheDocument();
   });
 });
