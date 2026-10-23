@@ -42,9 +42,19 @@ vi.mock("@/lib/logger", () => ({
   logger: { warn: vi.fn(), error: vi.fn(), info: vi.fn() },
 }));
 
+// Every icon used by the rendered tree (ActivityHistory, TransactionTracker and
+// ActivityContent) must be stubbed: an undefined component type makes React
+// unmount the tree, so the activity list would render as an empty container.
 vi.mock("lucide-react", () => ({
   Loader2: () => null,
   Download: () => null,
+  Clock: () => null,
+  ExternalLink: () => null,
+  CheckCircle: () => null,
+  XCircle: () => null,
+  RefreshCw: () => null,
+  Ban: () => null,
+  FileSearch: () => null,
 }));
 
 vi.mock("@/components/ui/Button", () => ({
